@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:test_dji_fly/drone/drone.dart';
@@ -79,11 +82,11 @@ class _MainAppState extends State<MainApp> {
 
                                   print("Command info: $msg");
                                 });
-                                drone.videoStream.listen((msg) {
-                                  msg = String.fromCharCodes((msg as Datagram).data);
+                                // drone.videoStream.listen((msg) {
+                                //   msg = String.fromCharCodes((msg as Datagram).data);
 
-                                  print("Video info: $msg");
-                                });
+                                //   print("Video info: $msg");
+                                // });
 
                                 drone.sendData("command");
                                 await Future.delayed(const Duration(milliseconds: 500));
@@ -133,23 +136,25 @@ class VideoStream extends StatefulWidget {
 }
 
 class _VideoStreamState extends State<VideoStream> {
-  Uint8List bytes = Uint8List(0);
+  String? pngBytes;
   
   @override
   void initState() {
     super.initState();
-    widget.videoStream.listen((data) {
+    widget.videoStream.listen((data) async {
       data = data as Datagram;
-
+      var codec = await instantiateImageCodec(data.data);
+      var frame = await codec.getNextFrame();
+      var byteData = await frame.image.toByteData(format: ImageByteFormat.png);
       setState(() {
-        bytes = data.data;
+        pngBytes = base64Encode(byteData!.buffer.asUint8List());
       });
     });
   }
   
   @override
   Widget build(BuildContext context) {
-    return Image.memory(bytes);
+    return pngBytes == null ? const SizedBox() : Image.memory(base64Decode(pngBytes!));
   }
 }
 
