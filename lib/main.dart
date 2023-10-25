@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:test_dji_fly/drone/drone.dart';
@@ -136,25 +134,28 @@ class VideoStream extends StatefulWidget {
 }
 
 class _VideoStreamState extends State<VideoStream> {
-  String? pngBytes;
+  Uint8List? bytes;
   
   @override
   void initState() {
     super.initState();
-    widget.videoStream.listen((data) async {
+    widget.videoStream.listen((data) {
       data = data as Datagram;
-      var codec = await instantiateImageCodec(data.data);
-      var frame = await codec.getNextFrame();
-      var byteData = await frame.image.toByteData(format: ImageByteFormat.png);
+
       setState(() {
-        pngBytes = base64Encode(byteData!.buffer.asUint8List());
+        bytes = data.data;
       });
     });
   }
   
   @override
   Widget build(BuildContext context) {
-    return pngBytes == null ? const SizedBox() : Image.memory(base64Decode(pngBytes!));
+    return bytes == null ? const SizedBox() : Image.memory(
+      Uint8List.fromList(
+        base64Decode(bytes.toString()
+        ),
+      ),
+    );
   }
 }
 
