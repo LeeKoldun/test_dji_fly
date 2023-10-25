@@ -1,7 +1,10 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:test_dji_fly/drone/drone.dart';
 
-void main() {
+void main() {  
   runApp(const MainApp());
 }
 
@@ -19,6 +22,16 @@ class _MainAppState extends State<MainApp> {
   late DjiDrone drone;
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
@@ -26,6 +39,8 @@ class _MainAppState extends State<MainApp> {
             child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+
+            if(isStarted) VideoStream(videoStream: drone.videoStream),
             TextField(
               onChanged: (text) {
                 command = text;
@@ -60,13 +75,20 @@ class _MainAppState extends State<MainApp> {
                                 );
 
                                 drone.reciever.listen((msg) {
-                                  print(msg);
+                                  msg = String.fromCharCodes((msg as Datagram).data);
+
+                                  print("Command info: $msg");
+                                });
+                                drone.videoStream.listen((msg) {
+                                  msg = String.fromCharCodes((msg as Datagram).data);
+
+                                  print("Video info: $msg");
                                 });
 
                                 drone.sendData("command");
-                                await Future.delayed(
-                                    const Duration(milliseconds: 500));
-                                drone.sendData("takeoff");
+                                await Future.delayed(const Duration(milliseconds: 500));
+                                drone.sendData("battery?");
+                                // drone.sendData("takeoff");
 
                                 setState(() {
                                   isStarted = true;
@@ -78,6 +100,7 @@ class _MainAppState extends State<MainApp> {
                             ? null
                             : () {
                                 drone.sendData("land");
+                                drone.dispose();
                                 setState(() {
                                   isStarted = false;
                                   lock = false;
@@ -94,6 +117,39 @@ class _MainAppState extends State<MainApp> {
         )),
       ),
     );
+  }
+}
+
+class VideoStream extends StatefulWidget {
+  final Stream videoStream;
+
+  const VideoStream({
+    super.key,
+    required this.videoStream,
+  });
+
+  @override
+  State<VideoStream> createState() => _VideoStreamState();
+}
+
+class _VideoStreamState extends State<VideoStream> {
+  Uint8List bytes = Uint8List(0);
+  
+  @override
+  void initState() {
+    super.initState();
+    widget.videoStream.listen((data) {
+      data = data as Datagram;
+
+      setState(() {
+        bytes = data.data;
+      });
+    });
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Image.memory(bytes);
   }
 }
 
@@ -156,7 +212,24 @@ class Controls extends StatelessWidget {
               text: "Down"
             ),
           ],
-        )
+        ),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ControlButton(
+              drone: drone, 
+              commandToSend: "streamon", 
+              text: "Camera on"
+            ),
+            ControlButton(
+              drone: drone, 
+              commandToSend: "streamoff", 
+              text: "Camera off"
+            ),
+          ],
+        ),
+
       ],
     );
   }
@@ -166,12 +239,14 @@ class ControlButton extends StatelessWidget {
   final DjiDrone drone;
   final String commandToSend;
   final String text;
+  final VoidCallback? onPressed;
 
   const ControlButton({
     super.key, 
     required this.drone, 
     required this.commandToSend, 
-    required this.text
+    required this.text,
+    this.onPressed,
   });
 
   @override
@@ -179,6 +254,7 @@ class ControlButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: () {
         drone.sendData(commandToSend);
+        onPressed?.call();
       },
       child: Text(text)
     );
